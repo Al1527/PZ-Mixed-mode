@@ -1,9 +1,9 @@
 CXX = g++
-CXXFLAGS = -std=c++17 `pkg-config --cflags opencv4`
-LDFLAGS = -lopencv_core -lopencv_imgcodecs -lopencv_highgui
+CXXFLAGS = -std=c++17 `pkg-config --cflags opencv4` -Iinclude
+LDFLAGS = -lopencv_core -lopencv_imgcodecs -lopencv_highgui -lopencv_imgproc
 
 TARGET = main
-SRCS = main.cpp
+SRCS = src/main.cpp src/imagesManager.cpp
 
 all: $(TARGET)
 
@@ -12,4 +12,3 @@ $(TARGET): $(SRCS)
 
 clean:
 	rm -f $(TARGET)
-
