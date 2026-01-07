@@ -1,0 +1,20 @@
+Pobierz źródła VTK: https://vtk.org/download/
+Otwórz CMake GUI: https://cmake.org/download/
+Ustaw:
+	*Where is the source code: folder VTK
+	*Where to build the binaries: np. VTK-build
+
+Kliknij Configure → wybierz Visual Studio 2022 x64
+Zaznacz: VTK_BUILD_SHARED_LIBS = ON
+Kliknij Generate
+Otwórz projekt w Visual Studio
+Zbuduj ALL_BUILD i INSTALL (zajmuje to kilkanaście minut nawet na mocnym komputerze)
+
+Po instalacji będziesz mieć strukturę:
+C:/VTK-install/
+    include/vtk-9.3/
+    bin/
+    lib/
+
+ustaw zmienną środowiskową: VTK_DIR = C:/VTK-install/lib/cmake/vtk-9.3
+Reszta jest już w CMakeLists.txt
