@@ -1,0 +1,210 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 1400
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [0, 0], [5, 1], [10, 0], [15, -1], [20, 0], [25, 2], [30, 5], [35, 8], [40, 10], 
+          [45, 11], [50, 10], [55, 8], [60, 5], [65, 2], [70, 0], [75, -1], [80, 0], 
+          [85, 1], [90, 0], [95, -2], [100, -3]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 1600
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [3, 8], [8, 9], [13, 10], [18, 12], [23, 15], [28, 18], [33, 22], [38, 25], 
+          [43, 27], [48, 28], [53, 27], [58, 25], [63, 22], [68, 18], [73, 15], 
+          [78, 12], [83, 10], [88, 9], [93, 8]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 1800
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [8, 15], [13, 17], [18, 20], [23, 24], [28, 28], [33, 33], [38, 38], 
+          [43, 42], [48, 45], [53, 46], [58, 45], [63, 42], [68, 38], [73, 33], 
+          [78, 28], [83, 24], [88, 20], [93, 17]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 2000
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [12, 22], [17, 25], [22, 29], [27, 34], [32, 39], [37, 45], [42, 50], 
+          [47, 55], [52, 58], [57, 59], [62, 58], [67, 55], [72, 50], [77, 45], 
+          [82, 39], [87, 34], [92, 29]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 2200
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [16, 30], [21, 34], [26, 39], [31, 45], [36, 51], [41, 58], [46, 64], 
+          [51, 69], [56, 72], [61, 73], [66, 72], [71, 69], [76, 64], [81, 58], 
+          [86, 51], [91, 45]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 2400
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [20, 38], [25, 43], [30, 49], [35, 56], [40, 63], [45, 70], [50, 76], 
+          [55, 81], [60, 84], [65, 85], [70, 84], [75, 81], [80, 76], [85, 70]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 2600
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [24, 47], [29, 53], [34, 60], [39, 67], [44, 74], [49, 81], [54, 87], 
+          [59, 91], [64, 93], [69, 92], [74, 91], [79, 87]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 2800
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [28, 56], [33, 63], [38, 70], [43, 77], [48, 84], [53, 90], [58, 95], 
+          [63, 98], [68, 99], [73, 98]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 3000
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [32, 65], [37, 72], [42, 79], [47, 86], [52, 92], [57, 97], [62, 100], [67, 101]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 3200
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [36, 74], [41, 81], [46, 88], [51, 94], [56, 99], [61, 102]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 3400
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [40, 83], [45, 90], [50, 96], [55, 100]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 3600
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [44, 92], [49, 98], [54, 102]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 1600
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [5, 30], [10, 28], [15, 26], [20, 25], [25, 26], [30, 28]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 1800
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [8, 35], [13, 33], [18, 32], [23, 33], [28, 35]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 2000
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [11, 40], [16, 38], [21, 38], [26, 40]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "elevation": 2200
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [14, 45], [19, 44], [24, 45]
+        ]
+      }
+    }
+  ]
+}
