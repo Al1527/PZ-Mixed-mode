@@ -1,0 +1,17 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/g++",
+      "-c",
+      "-std=c++17",
+      "-I/usr/include/opencv4",
+      "-Iinclude",
+      "-o",
+      "main",
+      "src/main.cpp"
+    ],
+    "directory": "/home/nikolas/Project/PZ-Mixed-mode/LoadingImages",
+    "file": "/home/nikolas/Project/PZ-Mixed-mode/LoadingImages/src/main.cpp",
+    "output": "/home/nikolas/Project/PZ-Mixed-mode/LoadingImages/main"
+  }
+]
