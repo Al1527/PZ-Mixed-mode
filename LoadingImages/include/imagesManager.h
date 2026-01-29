@@ -11,8 +11,9 @@ void putImageToDirectory(std::filesystem::path directoryPath, cv::Mat image, std
 void loadImages(std::filesystem::path directoryPath, std::vector<cv::Mat> &images);
 void showImage(cv::Mat image, cv::String name);
 
-cv::Mat connectAllImages(std::vector<cv::Mat> images);
-cv::Mat connectTwoImages(cv::Mat left, cv::Mat right);
+cv::Mat connectAllImages(std::vector<cv::Mat> images, std::pair<int, int> option);
+cv::Mat connectTwoImagesHorizontally(cv::Mat left, cv::Mat right);
+cv::Mat connectTwoImagesVertically(cv::Mat left, cv::Mat right);
 cv::Point findPoint(cv::Mat left, cv::Mat right, int tX, int tY, int tWidht, int tHeight);
 
 cv::Mat removeAllOtherColors(cv::Mat img, cv::Scalar rgb, int diff);

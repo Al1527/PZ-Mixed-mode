@@ -128,7 +128,7 @@ cv::Point findPoint(cv::Mat left, cv::Mat right, int tX, int tY, int tWidht, int
   return maxLoc;
 }
 
-cv::Mat connectTwoImages(cv::Mat left, cv::Mat right){
+cv::Mat connectTwoImagesHorizontally(cv::Mat left, cv::Mat right){
   cv::Point match = findPoint(left, right, 0, right.rows / 4, 40, right.rows / 2);
 
   int diffY = match.y - (right.rows / 4);
@@ -148,13 +148,45 @@ cv::Mat connectTwoImages(cv::Mat left, cv::Mat right){
 
   return output;
 }
-  
-cv::Mat connectAllImages(std::vector<cv::Mat> images){
-  cv::Mat output = images[0];
 
-  for (int i = 1; i < images.size(); i++){
-    output = connectTwoImages(output, images[i]); 
+cv::Mat connectTwoImagesVertically(cv::Mat left, cv::Mat right){
+  cv::Point match = findPoint(left, right, right.cols / 4, 0, right.cols / 2, 40);
+
+  int diffX = match.x - (right.cols / 4);
+  int minX = std::max(0, diffX);
+  int maxX = std::min(left.cols, diffX + right.cols);
+  
+  int outputWidth = maxX - minX;
+  int outputHeight = match.y + right.rows;
+
+  cv::Mat output(outputHeight, outputWidth, left.type());
+
+  left(cv::Rect(minX, 0, outputWidth, match.y))
+  .copyTo(output(cv::Rect(0, 0, outputWidth, match.y)));
+
+  right(cv::Rect(minX - diffX, 0, outputWidth, right.rows))
+  .copyTo(output(cv::Rect(0, match.y, outputWidth, right.rows)));
+
+  return output;
+}
+  
+cv::Mat connectAllImages(std::vector<cv::Mat> images, std::pair<int, int> option){
+  std::vector<cv::Mat> rows;
+  
+  for (int i = 0; i < images.size(); i += option.second){
+    cv::Mat buf = images[i];
+    for (int j = i + 1; j < i + option.second; j++){
+      buf = connectTwoImagesHorizontally(buf, images[j]);
+    }
+    rows.push_back(buf);
   }
+
+  cv::Mat output = rows[0];
+
+  for (int i = 1; i <rows.size(); i++){
+    output = connectTwoImagesVertically(output, rows[i]);
+  }
+
   return output;
 }
 

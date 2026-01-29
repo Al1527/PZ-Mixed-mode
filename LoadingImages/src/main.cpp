@@ -1,5 +1,6 @@
 #include <opencv2/opencv.hpp>
 #include <filesystem>
+#include <utility>
 #include <vector>
 #include "imagesManager.h"
 #include "opencv2/core.hpp"
@@ -17,6 +18,7 @@ int lowHue = 0, lowSaturation = 0, lowValue = 0;
 int highHue = 0, highSaturation = 0, highValue = 0;
 int size = 1;
 cv::Scalar rgb;
+std::pair<int, int> option;
 
 static void getColor(int event, int x, int y, int, void* userdata);
 static void drawPixelWhite(int event, int x, int y, int, void* userdata);
@@ -24,7 +26,15 @@ void drawRectengle(int x, int y, void* userdata, int a, int color);
 
 int main() {
   loadImages("images", images);
-  
+
+  for (int i = 1; i <= images.size(); i++){
+    if (images.size() % i == 0){
+      std::cout << images.size() / i << " " <<  i << std::endl;
+    }
+  }
+  std::cout << "Wybierz w jaki sposob chcesz zlaczyc zdjecia : "; 
+  std::cin >> option.first >> option.second;
+ 
   std::vector<cv::Mat> convertedImages;
 
   cv::Mat first = images[0];
@@ -68,7 +78,7 @@ int main() {
 
   cv::namedWindow("drawWindow");
   cv::createTrackbar("Size ", "drawWindow", nullptr, 20);
-  cv::Mat out = connectAllImages(convertedImages);
+  cv::Mat out = connectAllImages(convertedImages, option);
   cv::setMouseCallback("drawWindow", drawPixelWhite, &out);
   while (true) {
     size = cv::getTrackbarPos("Size ", "drawWindow");
