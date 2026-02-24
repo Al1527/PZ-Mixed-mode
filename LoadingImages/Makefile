@@ -3,7 +3,7 @@ CXXFLAGS = -std=c++17 `pkg-config --cflags opencv4` -Iinclude
 LDFLAGS = -lopencv_core -lopencv_imgcodecs -lopencv_highgui -lopencv_imgproc
 
 TARGET = main
-SRCS = src/main.cpp src/imagesManager.cpp
+SRCS = src/main.cpp src/imagesManager.cpp src/contour.cpp src/point.cpp
 
 all: $(TARGET)
 

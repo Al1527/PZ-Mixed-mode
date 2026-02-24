@@ -5,26 +5,33 @@
 #include "imagesManager.h"
 #include "opencv2/core.hpp"
 #include "opencv2/highgui.hpp"
+#include "contour.h"
+#include "point.h"
 
 
 std::vector<cv::Mat> images;
+std::vector<Contour> contours;
+std::vector<Point> points;
 
 const int maxToleranceHue = 100;
 const int maxTolerance = 100;
 
 int colorChosed = 1;
 
+int height = 0;
 int lowHue = 0, lowSaturation = 0, lowValue = 0;
 int highHue = 0, highSaturation = 0, highValue = 0;
 int size = 1;
 cv::Scalar rgb;
 std::pair<int, int> option;
 
+static void createContour(int event, int x, int y, int, void *userdata);
 static void getColor(int event, int x, int y, int, void* userdata);
 static void drawPixelWhite(int event, int x, int y, int, void* userdata);
 void drawRectengle(int x, int y, void* userdata, int a, int color);
 
 int main() {
+  
   loadImages("images", images);
 
   for (int i = 1; i <= images.size(); i++){
@@ -34,7 +41,7 @@ int main() {
   }
   std::cout << "Wybierz w jaki sposob chcesz zlaczyc zdjecia : "; 
   std::cin >> option.first >> option.second;
- 
+
   std::vector<cv::Mat> convertedImages;
 
   cv::Mat first = images[0];
@@ -52,7 +59,7 @@ int main() {
 
   cv::Mat img = images[0]; 
   cv::Mat img_HSV, img_threshold;
-  
+
   cv::Vec3b hsv = convertRGBtoHSV(rgb);
   int h = hsv[0]; int s = hsv[1]; int v = hsv[2];
 
@@ -98,7 +105,37 @@ int main() {
 
   putImageToDirectory("output", out, "output");
 
+  cv::namedWindow("createContours");
+  cv::setMouseCallback("createContours", createContour, &out);
+  cv::createTrackbar("Height",  "createContours", &height, 100);
+
+  while(true){
+    cv::imshow("createContours", out);
+    char key = (char) cv::waitKey(10);
+    if (key == 'q' || key == 27){
+      break;
+    }
+  }
+  cv::destroyAllWindows();
+
+  for (int i = 0; i < contours.size(); i++){
+    contours[i].createPoints(images[0], points, 100);
+  }
+
+  createGeoJson(points, "output");  
+
+
   return 0; 
+}
+
+static void createContour(int event, int x, int y, int , void *userdata){
+  if (event == cv::EVENT_LBUTTONDOWN){
+    cv::Mat* img = reinterpret_cast<cv::Mat*>(userdata); 
+
+    if (x >= 0 && x < img->cols && y >= 0 && y < img->rows){
+      contours.push_back(Contour(*img, x, y, height));
+    } 
+  }
 }
 
 static void getColor(int event, int x, int y, int, void* userdata){
