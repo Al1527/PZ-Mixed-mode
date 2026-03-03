@@ -1,0 +1,12 @@
+{
+  "imageFormat": {
+    "columns": 1,
+    "rows": 1
+  },
+  "contour": {
+    "minHeight": 1000,
+    "maxHeight": 2300,
+    "maxToleranceOfColor": 100,
+    "freqOfPoints": 200
+  }
+}

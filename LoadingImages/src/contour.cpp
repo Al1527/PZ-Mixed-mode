@@ -1,6 +1,10 @@
 #include "contour.h"
+#include "json.hpp"
+#include "iostream"
 #include <stack>
 #include <vector>
+#include "fstream"
+
 
 Contour::Contour(cv::Mat &img, int x, int y, double h){
   height = h; 
@@ -18,7 +22,7 @@ Contour::Contour(cv::Mat &img, int x, int y, double h){
       uchar &pix = img.at<uchar>(buf.second, buf.first);
       if (pix == 255){
         pix = 100;
-        pixelsInCountour.push_back(buf);
+        pixelsInCountour.insert(buf);
 
         for (int i = 0; i < 8; i++){
           s.push({buf.first + tabx[i], buf.second + taby[i]});
@@ -28,15 +32,53 @@ Contour::Contour(cv::Mat &img, int x, int y, double h){
   }
 }
 
-void Contour::createPoints(cv::Mat &img, std::vector<Point> &points, int freq){
+void Contour::addContourToGeoJson(cv::Mat& img, int freq, std::filesystem::path directoryPath){
+  std::vector<std::pair<int, int>> vec;
+
   int xFreq = img.cols / freq;
   int yFreq = img.rows / freq;
-  
+
   for (int i = 0; i < img.cols; i += xFreq){
     for (int j = 0; j < img.rows; j += yFreq){
-      if (std::find(pixelsInCountour.begin(), pixelsInCountour.end(), std::make_pair(i,j)) != pixelsInCountour.end()){
-        points.push_back(Point(i, j, height));
+      if (pixelsInCountour.find({i, j}) != pixelsInCountour.end()){
+        vec.push_back({i, j});
       }
     }
   }
+
+  if (vec.size() < 2) {
+    std::cout << "Error: Znaleziono za malo punktow, nie mozna stworzyc poziomicy";
+    return;
+  }
+
+  std::filesystem::path filePath = directoryPath / "contours.geojson";
+  nlohmann::json geojson;
+
+  if (std::filesystem::exists(filePath)) {
+      std::ifstream inFile(filePath);
+      inFile >> geojson;
+      inFile.close();
+  } else {
+      geojson["type"] = "FeatureCollection";
+      geojson["features"] = nlohmann::json::array();
+  }
+
+  nlohmann::json coordinates = nlohmann::json::array();
+  for (const auto& p : vec) {
+      coordinates.push_back({p.first, p.second});
+  }
+
+  nlohmann::json feature;
+  feature["type"] = "Feature";
+  feature["properties"] = {
+      {"elevation", height}
+  };
+  feature["geometry"] = {
+      {"type", "LineString"},
+      {"coordinates", coordinates}
+  };
+  geojson["features"].push_back(feature);
+
+  std::ofstream outFile(filePath);
+  outFile << geojson.dump(4);
 }
