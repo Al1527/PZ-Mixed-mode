@@ -4,9 +4,9 @@ from shapely.geometry import Polygon
 import trimesh.creation
 
 def generate_hex_centers(bbox_min, bbox_max, hex_size=1.0):
-    """Generuje centra heksagonów pokrywające bounding box modelu"""
-    dx = hex_size * np.sqrt(3)
-    dy = hex_size * 1.5
+    """Generuje centra heksagonów - spacing wyliczony geometrycznie"""
+    dx = hex_size * np.sqrt(3)      # poziomy odstęp między centrami
+    dy = hex_size * 1.5             # pionowy odstęp między centrami
     
     centers = []
     row = 0
@@ -31,39 +31,49 @@ def create_hex_prism(cx, cy, z, hex_size, height):
     mesh.apply_translation([0, 0, z])
     return mesh
 
-def project_hex_onto_mesh(source_mesh, hex_size=2.0, hex_height=0.5, gap=0.1):
+def project_hex_onto_mesh(source_mesh, hex_size=2.0, gap=0.1):
     bbox_min = source_mesh.bounds[0]
     bbox_max = source_mesh.bounds[1]
     
-    centers = generate_hex_centers(bbox_min, bbox_max, hex_size + gap)
+    centers = generate_hex_centers(bbox_min, bbox_max, hex_size)
     
-    # Closest point zamiast ray casting
     from trimesh.proximity import closest_point
     query_points = np.array([[cx, cy, (bbox_min[2] + bbox_max[2]) / 2] for cx, cy in centers])
     closest, distances, _ = closest_point(source_mesh, query_points)
     
-    z_base_global = bbox_min[2]  # najniższy punkt modelu
+    z_base_global = bbox_min[2]
     hex_meshes = []
 
     for i, (cx, cy) in enumerate(centers):
         z_top = closest[i][2]
         try:
-            h = create_hex_prism_to_base(cx, cy, z_top, hex_size * 0.95, z_base_global)
+            h = create_hex_prism_to_base(cx, cy, z_top, hex_size - gap, z_base_global)
             hex_meshes.append(h)
         except Exception as e:
-            print(f"Pominięto hex ({cx:.1f}, {cy:.1f}): {e}")
             continue
 
     if not hex_meshes:
         return None
 
-    print(f"Wygenerowano {len(hex_meshes)} heksów")
+    print(f"Łączenie {len(hex_meshes)} heksów przez boolean union...")
     
-    result = trimesh.util.concatenate(hex_meshes)
-    trimesh.repair.fill_holes(result)
-    trimesh.repair.fix_normals(result)
+    # Boolean union łączy wszystkie hexy w jeden watertight solid
+    import trimesh.boolean
+    result = hex_meshes[0]
+    batch_size = 10  # łącz po 10 na raz żeby nie zabić RAM-u
+    
+    for i in range(1, len(hex_meshes), batch_size):
+        batch = hex_meshes[i:i+batch_size]
+        batch_merged = trimesh.util.concatenate([result] + batch)
+        try:
+            result = trimesh.boolean.union([result] + batch, engine='manifold')
+        except Exception:
+            result = batch_merged  # fallback jeśli union zawiedzie
+        print(f"  Postęp: {min(i+batch_size, len(hex_meshes))}/{len(hex_meshes)}")
+
     print("Watertight:", result.is_watertight)
     return result
+    
 def create_hex_prism_to_base(cx, cy, z_top, hex_size, z_base):
     """Hex rozciągnięty od z_base do z_top – bez dziur"""
     angles = np.linspace(0, 2 * np.pi, 7)[:-1] + np.pi / 6
@@ -86,15 +96,9 @@ source = trimesh.load("terrain1.stl")
 hex_grid = project_hex_onto_mesh(
     source_mesh=source,
     hex_size=3.0,      # rozmiar hexa (promień)
-    hex_height=1.5,    # wysokość wytłoczenia
-    gap=0.3            # odstęp między heksami
+    gap=0.0            # odstęp między heksami
 )
 
 if hex_grid is not None:
     hex_grid.export("hex_grid.stl")
     print("Zapisano: hex_grid.stl")
-    
-    # Opcjonalnie: połącz oba modele w jeden plik
-    #combined = trimesh.util.concatenate([source, hex_grid])
-    #combined.export("model_z_hexami.stl")
-    #print("Zapisano: model_z_hexami.stl")
