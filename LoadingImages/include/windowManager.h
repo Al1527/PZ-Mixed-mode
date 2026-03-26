@@ -21,6 +21,8 @@ class WindowManager{
     HueParameters hueParameters;
     cv::Scalar rgb;
     int height = 0;
+    int basedHeight = 0;
+    int scaleHeight = 1;
     int size = 1;
     int colorChosed = 1;
 

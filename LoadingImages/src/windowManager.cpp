@@ -116,6 +116,8 @@ void WindowManager::drawRectengle(cv::Mat& img, int x, int y, int size, int colo
 
 std::vector<Contour> WindowManager::createContourWindow(cv::Mat& img, Config& config){
   int diff = config.maxContourHeight - config.minContourHeight;
+  basedHeight = config.minContourHeight;
+  scaleHeight = config.scaleOfHeight;
   this->img = img;
   cv::namedWindow("createContours");
   cv::setMouseCallback("createContours", createContour, this);
@@ -137,7 +139,7 @@ void WindowManager::createContour(int event, int x, int y, int , void *userdata)
   auto* self = reinterpret_cast<WindowManager*>(userdata);
   if (event == cv::EVENT_LBUTTONDOWN){
     if (x >= 0 && x < self->img.cols && y >= 0 && y < self->img.rows){
-      self->contours.push_back(Contour(self->img, x, y, self->height));
+      self->contours.push_back(Contour(self->img, x, y, self->scaleHeight * (self->basedHeight + self->height)));
     } 
   }
 }

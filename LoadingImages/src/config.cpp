@@ -1,4 +1,5 @@
 #include "config.h"
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include "json.hpp"
@@ -7,6 +8,7 @@
 Config::Config(){
   imageFormatColumns = 1;
   imageFormatRows = 1;
+  scaleOfHeight = 0;
   minContourHeight = 0;
   maxContourHeight = 1000;
   maxToleranceOfColor = 100;
@@ -24,10 +26,23 @@ void Config::load(std::string filename){
 
   imageFormatColumns = data["imageFormat"].value("columns", 1);
   imageFormatRows = data["imageFormat"].value("rows", 1);
+  scaleOfHeight = data["contour"].value("scaleOfHeight", 1);
   minContourHeight = data["contour"].value("minHeight", 0); 
   maxContourHeight = data["contour"].value("maxHeight", 100); 
   maxToleranceOfColor = data["contour"].value("maxToleranceOfColor", 100); 
-  freqOfPointsInContour = data["contour"].value("freqOfPointsInContour", 100); 
+  freqOfPointsInContour = data["contour"].value("freqOfPoints", 100); 
+}
+
+void Config::clearFolder(std::filesystem::path folderPath){
+
+  if (!std::filesystem::exists(folderPath)) {
+    std::cout << "Error: blad czyszczenia folderu" << std::endl;
+    return;
+  }
+
+  for (const auto& entry : std::filesystem::directory_iterator(folderPath)){
+    std::filesystem::remove(entry.path());
+  }
 }
 
 bool Config::checkConfiguration(){

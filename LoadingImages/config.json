@@ -4,9 +4,10 @@
     "rows": 1
   },
   "contour": {
-    "minHeight": 1000,
-    "maxHeight": 2300,
+    "scaleOfHeight": 1000,
+    "minHeight": 1850,
+    "maxHeight": 1992,
     "maxToleranceOfColor": 100,
-    "freqOfPoints": 200
+    "freqOfPoints": 300
   }
 }
