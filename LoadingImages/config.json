@@ -7,7 +7,7 @@
     "scaleOfHeight": 1000,
     "minHeight": 1850,
     "maxHeight": 1992,
-    "maxToleranceOfColor": 100,
+    "maxToleranceOfColor": 200,
     "freqOfPoints": 300
   }
 }
