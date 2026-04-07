@@ -64,9 +64,9 @@ def floodfill(px, color_to_change,target_color,source_img, output_base_img=None,
                 if output_base_img is not None:
                     output_base_img[i,y] = target_color
             for i in range(w+1,e):
-                if m[i,y+1] == color_to_change:
+                if i<m.shape[0] and y+1<m.shape[1] and m[i,y+1] == color_to_change:
                     Q.append((i,y+1))
-                if m[i,y-1] == color_to_change:
+                if i<m.shape[0] and y-1>=0 and m[i,y-1] == color_to_change:
                     Q.append((i,y-1))
             if e == m.shape[0]:
                 break
@@ -227,11 +227,6 @@ if __name__ == "__main__":
     img_path = "example_map3.png"
     peak_coords = {110 : [(1222,1553)],100 : [(1270,3000)]}
 
-    #peak_coords,img_path = {100 : [(11,12)]}, "example_map_mini.png"
-
     valley_coords = {}
 
-    #peak_coords = {}
-    #valley_coords = {90 : [(1222,1553)], 100: [(1270,3000)]}
-
-    prepped_img_to_geojson(peak_coords, valley_coords, 10, img_path, "temp/geo.geojson", None, True, True, 30, 0)
+    prepped_img_to_geojson(peak_coords, valley_coords, 10, img_path, "temp/geo.geojson", None, True, False, 30, 0)
