@@ -202,7 +202,8 @@ def layer_png_to_geojson(img_path,geojson_path,max_point=30,min_height=0):
 
     height_modifier = min_height - keys[0] if min_height is not None else 0
     for k in keys:
-        geo["features"].append({"geometry" : {"coordinates" : d[k]["c"][0], "type" : "LineString"}, "properties" : {"elevation" : float(k + height_modifier)}, "type" : "Feature"})
+        for c in d[k]["c"]:
+            geo["features"].append({"geometry" : {"coordinates" : c, "type" : "LineString"}, "properties" : {"elevation" : float(k + height_modifier)}, "type" : "Feature"})
     j = json.dumps(geo,indent=1)
     with open(geojson_path, mode="w") as f:
         f.write(j)
