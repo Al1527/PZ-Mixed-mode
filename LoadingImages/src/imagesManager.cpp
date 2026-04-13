@@ -5,6 +5,7 @@
 #include "opencv2/core/types.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgcodecs.hpp"
+#include <opencv2/ximgproc.hpp>
 #include <string>
 #include <vector>
 
@@ -190,3 +191,34 @@ cv::Mat connectAllImages(std::vector<cv::Mat> images, std::pair<int, int> option
   return output;
 }
 
+cv::Mat morphologyClosing(cv::Mat image, int size, int e){
+  cv::Mat output;
+
+  cv::Mat element = cv::getStructuringElement(e, cv::Size((2 * size) + 1, (2 * size) + 1));
+
+  cv::morphologyEx(image, output, cv::MORPH_CLOSE, element);
+
+  return output;
+}
+
+cv::Mat skeletonization(cv::Mat image, int size, int e){
+  cv::Mat element = cv::getStructuringElement(e, cv::Size(size, size));
+  cv::Mat buf;
+
+  cv::dilate(image, buf, element, cv::Point(-1,-1), 1);
+  cv::Mat output;
+
+  cv::ximgproc::thinning(buf, output, cv::ximgproc::THINNING_ZHANGSUEN);
+
+  return output;
+}
+
+cv::Mat morphologyOpening(cv::Mat image, int size){
+  cv::Mat output;
+
+  cv::Mat element = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(size, size));
+
+  cv::morphologyEx(image, output, cv::MORPH_OPEN, element);
+  
+  return output;
+}

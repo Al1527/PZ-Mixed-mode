@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include "imagesManager.h"
+#include "opencv2/opencv.hpp"
 
 cv::Scalar WindowManager::pickColorWindow(cv::Mat &img){
   this->img = img;
@@ -142,5 +143,28 @@ void WindowManager::createContour(int event, int x, int y, int , void *userdata)
       self->contours.push_back(Contour(self->img, x, y, self->scaleHeight * (self->basedHeight + self->height)));
     } 
   }
+}
+
+
+cv::Mat WindowManager::fixGapsInContourWindow(cv::Mat img){
+  cv::Mat output;
+  cv::namedWindow("fixGapsInContour");
+
+  cv::createTrackbar("0-Rect 1-Cross 2-Ellipse 3-Diamond", "fixGapsInContour", &morph_elem, 3);
+ 
+  cv::createTrackbar("size- ", "fixGapsInContour",&morph_size, 21);
+
+  while (true) {
+    output = skeletonization(img,  morph_size + 1, morph_elem);
+    cv::imshow("fixGapsInContour", output);
+
+    char key = (char) cv::waitKey(30);
+    if (key == 'q' || key == 27){
+      cv::destroyAllWindows();
+      break;
+    }
+  }
+    
+  return output;
 }
 

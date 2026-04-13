@@ -21,3 +21,7 @@ cv::Mat removeAllOtherColors(cv::Mat img, cv::Scalar rgb, int lowerDiff, int upp
 cv::Mat removeAllOtherColors(cv::Mat img, cv::Scalar rgb, int hueTolerance, int saturationTolerance, int valueTolerance);
 cv::Mat removeAllOtherColors(cv::Mat img, cv::Scalar rgb, int lowerHueTolerance, int lowerSaturationTolerance, int lowerValueTolerance, int upperHueTolerance, int upperSaturationTolerance, int upperValueTolerance);
 cv::Vec3b convertRGBtoHSV(cv::Scalar rgb);
+
+cv::Mat morphologyClosing(cv::Mat image, int size, int element);
+cv::Mat skeletonization(cv::Mat image, int size, int element); 
+cv::Mat morphologyOpening(cv::Mat image, int size);  

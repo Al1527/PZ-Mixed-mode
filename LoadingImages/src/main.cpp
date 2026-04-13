@@ -3,7 +3,6 @@
 #include "config.h"
 #include "imagesManager.h"
 #include "windowManager.h"
-#include "contour.h"
 
 int main() {
  
@@ -23,14 +22,11 @@ int main() {
 
   cv::Mat connectedImages = connectAllImages(convertedImages, {config.imageFormatColumns, config.imageFormatRows});
 
-  cv::Mat output = windowManager.drawWindow(connectedImages, config);
+  cv::Mat buf = windowManager.drawWindow(connectedImages, config);
+ 
+  cv::Mat output = windowManager.fixGapsInContourWindow(buf);
+  
   putImageToDirectory("output", output, "output"); 
-
-  std::vector<Contour> contours = windowManager.createContourWindow(output, config);
-
-  for (int i = 0; i < contours.size(); i++){
-    contours[i].addContourToGeoJson(output, config.freqOfPointsInContour, "output");
-  }
   
   return 0; 
 }

@@ -25,11 +25,14 @@ class WindowManager{
     int scaleHeight = 1;
     int size = 1;
     int colorChosed = 1;
+    int morph_elem = 0;
+    int morph_size = 0;
 
     cv::Scalar pickColorWindow(cv::Mat &img);
     std::vector<cv::Mat> removeColorWindow(std::vector<cv::Mat>& images, Config &config, cv::Scalar rgb);
     cv::Mat drawWindow(cv::Mat &img, Config &config);
-    std::vector<Contour> createContourWindow(cv::Mat &img, Config& config);
+    std::vector<Contour> createContourWindow(cv::Mat &img, Config& config); 
+    cv::Mat fixGapsInContourWindow(cv::Mat img); 
 
   private:
 
