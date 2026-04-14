@@ -50,6 +50,9 @@ https://docs.opencv.org/4.x/de/da9/tutorial_template_matching.html#autotoc_md629
 Tworzenie pliku GeoJson:
 https://github.com/nlohmann/GeoJson
 
-Usuwanie dziur miedzy poziomicami 
+Usuwanie dziur miedzy poziomicami:
 https://docs.opencv.org/4.x/d3/dbe/tutorial_opening_closing_hats.html
 https://docs.opencv.org/4.x/df/d2d/group__ximgproc.html#ga37002c6ca80c978edb6ead5d6b39740c
+
+Dokumentacja:
+Używany format doxygen - https://www.doxygen.nl/index.html
