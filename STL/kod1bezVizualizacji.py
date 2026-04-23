@@ -2,7 +2,8 @@ import json
 import numpy as np
 from scipy.interpolate import griddata
 from stl import mesh
-import matplotlib.pyplot as plt
+from matplotlib.path import Path
+
 
 class ContourToSTL:
     def __init__(self, resolution=1.0, max_size=1000.0, base_thickness=20.0):
@@ -17,6 +18,12 @@ class ContourToSTL:
         self.base_thickness = base_thickness
         self.contour_points = []
         self.elevations = []
+        self.polygons_with_holes = []
+        self.grid_x = None
+        self.grid_y = None
+        self.grid_z = None
+        self.vertices = None
+        self.faces = None
         
     def load_geojson(self, filename):
         """Wczytaj poziomice z pliku GeoJSON"""
@@ -30,26 +37,73 @@ class ContourToSTL:
             coords = geom['coordinates']
         
             if geom_type == 'LineString':
-                points = coords
+                for coord in coords:
+                    self.contour_points.append([coord[0], coord[1]])
+                    self.elevations.append(elevation)
+
             elif geom_type == 'MultiLineString':
-                points = [pt for line in coords for pt in line]
+                for line in coords:
+                    for coord in line:
+                        self.contour_points.append([coord[0], coord[1]])
+                        self.elevations.append(elevation)
+
             elif geom_type == 'Polygon':
-                # Tylko outer ring (coords[0]), reszta to dziury
-                points = coords[0]
+                # coords[0] = outer ring, coords[1:] = holes
+                outer = coords[0]
+                holes = coords[1:] if len(coords) > 1 else []
+                self._add_polygon(elevation, outer, holes)
+
             elif geom_type == 'MultiPolygon':
-                # Każdy polygon → outer ring
-                points = [pt for polygon in coords for pt in polygon[0]]
+                # Każdy element to jeden polygon z opcjonalnymi dziurami
+                for polygon in coords:
+                    outer = polygon[0]
+                    holes = polygon[1:] if len(polygon) > 1 else []
+                    self._add_polygon(elevation, outer, holes)
+
             else:
                 print(f"Nieobsługiwany typ geometrii: {geom_type}, pomijam")
-                continue
-        
-            for coord in points:
-                x, y = coord[0], coord[1]
-                self.contour_points.append([x, y])
-                self.elevations.append(elevation)
-    
+            
         print(f"Wczytano {len(self.contour_points)} punktów z poziomic")
         
+
+    def _add_polygon(self, elevation, outer_ring, hole_rings):
+        """Dodaj polygon do listy punktów i zapamiętaj geometrię z dziurami."""
+        # Dodaj punkty outer ringa do interpolacji
+        for coord in outer_ring:
+            self.contour_points.append([coord[0], coord[1]])
+            self.elevations.append(elevation)
+
+        # Zapamiętaj pełną geometrię (outer + holes) do maskowania
+        outer_np = np.array([[c[0], c[1]] for c in outer_ring])
+        holes_np = [np.array([[c[0], c[1]] for c in h]) for h in hole_rings]
+        self.polygons_with_holes.append((elevation, outer_np, holes_np))
+
+        if hole_rings:
+            print(f"  Polygon elevation={elevation}: outer ring + {len(hole_rings)} dziur(a)")
+
+    def _build_mask_for_holes(self, grid_x, grid_y):
+        """
+        Zwróć maskę boolean (True = punkt w dziurze, powinien mieć wartość z niższego polygonu).
+        Iteruje od najwyższej elewacji do najniższej.
+        """
+        height, width = grid_x.shape
+        points_flat = np.column_stack([grid_x.ravel(), grid_y.ravel()])
+
+        # Maska dziur: True = punkt leży w dziurze jakiegoś polygonu
+        hole_mask = np.zeros(len(points_flat), dtype=bool)
+
+        for elevation, outer, holes in self.polygons_with_holes:
+            if len(holes) == 0:
+                continue
+
+            for hole in holes:
+                if len(hole) < 3:
+                    continue
+                path = Path(hole)
+                in_hole = path.contains_points(points_flat)
+                hole_mask |= in_hole
+
+        return hole_mask.reshape(height, width)
     
     def create_heightmap(self, grid_size=None):
         if not self.contour_points:
@@ -89,6 +143,55 @@ class ContourToSTL:
             method='linear',
             fill_value=values.min()
         )
+
+        hole_mask = self._build_mask_for_holes(self.grid_x, self.grid_y)
+        if hole_mask.any():
+            print(f"Znaleziono {hole_mask.sum()} punktów siatki w dziurach — korygowanie...")
+            # Dla punktów w dziurach użyj wartości z niższego poziomu (nearest bez punktów wewnętrznych)
+            # Najprostsze podejście: nie zmieniaj — griddata liniowy i tak interpoluje poprawnie
+            # jeśli outer ring i inner ring mają tę samą elewację.
+            # Ale wyzeruj wkład punktów wewnętrznych przez re-interpolację bez ich strefy.
+            
+            # Alternatywa: zamiast re-interpolacji, po prostu obniż dziury do poziomu niższego
+            # Znajdź minimalną elewację polygonu otaczającego dziurę i użyj jej dla punktów w dziurze
+            for elevation, outer, holes in self.polygons_with_holes:
+                for hole in holes:
+                    if len(hole) < 3:
+                        continue
+                    points_flat = np.column_stack([self.grid_x.ravel(), self.grid_y.ravel()])
+                    path = Path(hole)
+                    in_hole = path.contains_points(points_flat).reshape(self.grid_x.shape)
+                    
+                    if in_hole.any():
+                        # Znajdź elewację tuż pod tym polygonem
+                        # (zakładamy że polygony są zagnieżdżone od najniższego do najwyższego)
+                        lower_elevation = elevation - 10  # TODO: dynamicznie z danych
+                        
+                        # Znajdź rzeczywistą niższą elewację z danych
+                        unique_elevations = sorted(set(self.elevations))
+                        idx = unique_elevations.index(elevation)
+                        if idx > 0:
+                            lower_elevation = unique_elevations[idx - 1]
+                        
+                        # Re-interpoluj tylko te punkty używając punktów z niższych warstw
+                        lower_mask = np.array(self.elevations) <= lower_elevation
+                        if lower_mask.sum() > 3:
+                            lower_points = points[lower_mask]
+                            lower_values = values[lower_mask]
+                            hole_coords = np.column_stack([
+                                self.grid_x[in_hole],
+                                self.grid_y[in_hole]
+                            ])
+                            corrected = griddata(
+                                lower_points,
+                                lower_values,
+                                hole_coords,
+                                method='linear',
+                                fill_value=lower_elevation
+                            )
+                            self.grid_z[in_hole] = corrected
+                            print(f"    Poprawiono dziurę w elevation={elevation} → wartości ~{lower_elevation}")
+
     
         print(f"Wysokość min: {self.grid_z.min():.1f}, max: {self.grid_z.max():.1f}")
         return self.grid_x, self.grid_y, self.grid_z
@@ -122,7 +225,7 @@ class ContourToSTL:
 
         z_min = self.grid_z.min()
         target_z = self.max_size - self.base_thickness
-        z_normalized = (self.grid_z - z_min) / z_range * target_z
+        z_normalized = (self.grid_z - z_min) * self.scale
 
         vertices = []
         faces = []
@@ -237,9 +340,7 @@ if __name__ == "__main__":
     )
     
     # Wczytaj poziomice z pliku
-    #converter.load_geojson('cont_multi.geojson')
-    converter.load_geojson('big_contours.geojson')
-    # Stwórz heightmap
+    converter.load_geojson('cont_multi.geojson')
     converter.create_heightmap()
     
     
@@ -247,5 +348,5 @@ if __name__ == "__main__":
     converter.generate_mesh()
     
     # Eksportuj do STL
-    converter.export_stl('terrain_big1.stl')
+    converter.export_stl('terrain_multi.stl')
 
