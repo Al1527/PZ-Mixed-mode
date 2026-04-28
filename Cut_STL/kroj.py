@@ -2,6 +2,10 @@ import trimesh
 import numpy as np
 import os
 
+def save_part(part, i, is_top, output_dir="output"):
+        suffix = "_z" if is_top else ""
+        part.export(os.path.join(output_dir, f"part_{i}{suffix}.stl"))
+    
 def split_mesh(mesh, plane_origin, plane_normal):
 
     slice_result = mesh.slice_plane(
@@ -92,12 +96,21 @@ def split_into_grid(mesh, step_x=None, step_y=None, step_z=None, output_dir="out
         parts = new_parts
 
     for i, part in enumerate(parts):
-        part.export(os.path.join(output_dir, f"part_{i}.stl"))
+        z_center = part.bounds.mean(axis=0)[2]
+        is_top = z_center > min_corner[2] + step_z
+        save_part(part, i, is_top, output_dir)
 
     print(f"{len(parts)}")
 
 
-mesh = trimesh.load("terrain2.stl")
+mesh = trimesh.load("terrain_d.stl")
+folder = r'C:\Users\Al05\Desktop\UMK\ZP\output'
+os.makedirs(folder, exist_ok=True)
+
+for filename in os.listdir(folder):
+    file_path = os.path.join(folder, filename)
+    if os.path.isfile(file_path):
+            os.remove(file_path)
 split_into_grid(
     mesh,
     step_x=int(input("x: ")),  
