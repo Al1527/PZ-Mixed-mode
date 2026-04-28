@@ -40,28 +40,46 @@ def project_hex_onto_mesh(source_mesh, hex_size=2.0, gap=0.1):
     centers = generate_hex_centers(bbox_min, bbox_max, hex_size)
     
     ray_origins = np.array([
-        [cx, cy, bbox_max[2] + 1.0]  # startuj PONAD modelem
+        [cx, cy, bbox_max[2] + 1.0]
         for cx, cy in centers
     ])
-    ray_directions = np.tile([0, 0, -1], (len(centers), 1))  # strzelaj w dół
+    ray_directions = np.tile([0, 0, -1], (len(centers), 1))
     
     intersector = trimesh.ray.ray_triangle.RayMeshIntersector(source_mesh)
     locations, ray_indices, _ = intersector.intersects_location(
         ray_origins, ray_directions, multiple_hits=False
     )
     
-    # Mapa: który ray trafił gdzie
     hit_map = {}
     for loc, ray_idx in zip(locations, ray_indices):
-        hit_map[ray_idx] = loc[2]  # Z trafienia
-    
+        hit_map[ray_idx] = loc[2]
+
+    # Buduj słownik: index -> (cx, cy, z_top)
+    centers_arr = np.array(centers)
+    hit_indices = list(hit_map.keys())
+    hit_xy = centers_arr[hit_indices]
+    hit_z  = np.array([hit_map[i] for i in hit_indices])
+
+    from scipy.spatial import cKDTree
+    tree = cKDTree(hit_xy)
+
+    # Dla każdego trafionego heksa — sprawdź czy jest znacznie niższy od sąsiadów
+    # Jeśli tak, podciągnij go do maksimum z sąsiedztwa
+    neighbor_radius = hex_size * 2.2  # promień w którym szukamy sąsiadów
+    z_smoothed = hit_z.copy()
+
+    for idx in range(len(hit_indices)):
+        neighbor_idxs = tree.query_ball_point(hit_xy[idx], r=neighbor_radius)
+        neighbor_z = hit_z[neighbor_idxs]
+        z_smoothed[idx] = max(hit_z[idx], np.max(neighbor_z) * 0.85)
+        # bierze własną wysokość LUB 85% maksimum sąsiadów — co większe
+
     z_base_global = bbox_min[2]
     hex_meshes = []
 
-    for i, (cx, cy) in enumerate(centers):
-        if i not in hit_map:
-            continue  # ray nie trafił w mesh (poza obrysem)
-        z_top = hit_map[i]
+    for out_idx, i in enumerate(hit_indices):
+        cx, cy = centers[i]
+        z_top = z_smoothed[out_idx]
         try:
             h = create_hex_prism_to_base(cx, cy, z_top, hex_size - gap, z_base_global)
             hex_meshes.append(h)
@@ -73,18 +91,15 @@ def project_hex_onto_mesh(source_mesh, hex_size=2.0, gap=0.1):
 
     print(f"Łączenie {len(hex_meshes)} heksów przez boolean union...")
     
-    # Boolean union łączy wszystkie hexy w jeden watertight solid
     result = hex_meshes[0]
-    batch_size = 10  # łącz po 10 na raz żeby nie zabić RAM-u
+    batch_size = 10
     
     for i in range(1, len(hex_meshes), batch_size):
         batch = hex_meshes[i:i+batch_size]
-        batch_merged = trimesh.util.concatenate([result] + batch)
         try:
             result = trimesh.boolean.union([result] + batch, engine='manifold')
         except Exception:
-            result = batch_merged  # fallback jeśli union zawiedzie
-        #print(f"  Postęp: {min(i+batch_size, len(hex_meshes))}/{len(hex_meshes)}")
+            result = trimesh.util.concatenate([result] + batch)
 
     print("Watertight:", result.is_watertight)
     return result
