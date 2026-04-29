@@ -5,6 +5,7 @@ import numpy as np
 from shapely.geometry import Polygon
 import trimesh.creation
 import os
+import re
 
 def generate_hex_centers(bbox_min, bbox_max, hex_size=1.0):
     """Generuje centra heksagonów - spacing wyliczony geometrycznie"""
@@ -151,6 +152,17 @@ print(f"Globalny bbox: {global_bbox_min} → {global_bbox_max}")
 
 folder_path = __path__ #sciezka do katalogu z pokrojonymi stl
 output_suffix = "_hex"
+hex_user = float(input("enter hex size: "))
+
+def transform_filename(filename):
+    """Dodawanie '_z' dla plików pokrojonych na górze."""
+    base, ext = os.path.splitext(filename)
+    match = re.search(r'part_(\d+)_z', base)
+    if match:
+        number = match.group(1)
+        new_base = f"part_{number}_hex_z"
+        return new_base + ext
+    return base + output_suffix + ext
 
 stl_files = [
     f for f in os.listdir(folder_path)
@@ -167,14 +179,14 @@ for filename in stl_files:
 
         result = project_hex_onto_mesh(
             source,
-            hex_size=3.0,
+            hex_size=hex_user,
             gap=0.0,
             global_origin=(global_bbox_min[0], global_bbox_min[1])  # wspólny punkt startowy
         )
 
         if result is not None:
             base, ext = os.path.splitext(filename)
-            out_path = os.path.join(folder_path, base + output_suffix + ext)
+            out_path = os.path.join(folder_path, transform_filename(filename))
             result.export(out_path)
             print(f"  Zapisano: {base + output_suffix + ext}\n")
         else:
