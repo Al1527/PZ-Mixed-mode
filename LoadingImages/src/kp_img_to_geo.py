@@ -1,28 +1,47 @@
 import cv2
 import numpy as np
 import os
-import sys
 import json
-import uuid
 from collections import deque
+from datetime import datetime
 
-def uuid_path(file_extension,filepath=None,temp_folder=False):
-    #Tworzy sciezke do pliku tymczasowego, jesli nie jest podana
-    p = str(uuid.uuid4())+file_extension if filepath is None else filepath
-    if temp_folder:
-        if not os.path.exists("temp"):
-            os.makedirs("temp")
-        p = os.path.join("temp",p)
-    return p
+geo = {"features": [], "type": "FeatureCollection"}
 
-def str_img(s):
-    print(str(s).replace(",","").replace("\n","").replace("[","").replace("]","\n").replace(" ","").replace("255"," ").replace("0","■")+"\n-------------------------------------------")
+#zmienic metode skalowania - podane z klawiatury
+#usunac to do szczytow
 
-def points_print(points,x,y):
-    a = [[0 for __ in range(y)] for _ in range(x)]
-    for p in points:
-        a[p[0]][p[1]] = 255
-    str_img(a)
+def fix_polygon(p):
+    if len(p) == 1:
+        return [p[0]] * 4
+    elif len(p) == 2:
+        return [p[0], p[1], p[1], p[0]]
+    else:
+        p.append(p[0])
+        return p
+
+def img_to_multipolygon(img, elevation, scaling_multiplier=1.0):
+    m = {"geometry" : {"coordinates" : [[]], "type" : "MultiPolygon"}, "properties" : {"elevation" : elevation}, "type" : "Feature"}
+    cont, hier = cv2.findContours(img, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_TC89_KCOS)
+    hier = hier[0]
+    coords = {}
+    for h in range(len(hier)):
+        c = (cont[h].reshape(-1, 2) * scaling_multiplier).tolist()
+        if hier[h][3] == -1:
+            if h not in coords:
+                coords[h] = {"outer": None, "inner": []}
+            coords[h]["outer"] = fix_polygon(c)
+        else:
+            if hier[h][3] not in coords:
+                coords[hier[h][3]] = {"outer": None, "inner": []}
+            coords[hier[h][3]]["inner"].append(fix_polygon(c))
+
+    for _ in coords:
+        c = coords[_]
+        m["geometry"]["coordinates"][-1].append(c["outer"])
+        for i in c["inner"]:
+            m["geometry"]["coordinates"][-1].append(i)
+
+    return m
 
 def floodfill(px, color_to_change,target_color,source_img, output_base_img=None, points = set()):
     #Przykladowo, dla px=(1,1), color_to_change=2, source_image=
@@ -76,157 +95,55 @@ def floodfill(px, color_to_change,target_color,source_img, output_base_img=None,
     else:
         return m,points
 
-def save_or_save_and_merge(base_outpath, path_suffix, img):
-    if os.path.exists(base_outpath+path_suffix):
-        i = cv2.imread(base_outpath + path_suffix, 0)
-        cv2.imwrite(base_outpath + path_suffix, cv2.bitwise_not(cv2.add(img * 255, cv2.bitwise_not(i))))
-    else:
-        cv2.imwrite(base_outpath+path_suffix, cv2.bitwise_not(img*255))
+def find_edge(a):
+    e = a - cv2.erode(a, np.ones((3,3), np.uint8))
+    return set(map(tuple,np.column_stack(np.where(e))))
 
-def fill_out_extremums(extremum_heights, extremum_coords, og_img, pbm_path):
-    for p in extremum_heights:
-        img = og_img * 1
-        for xy in extremum_coords[p]:
-            p_img = floodfill(xy, 0, 1, img, None)[0]
-            o_img = floodfill(xy, 1, 2, p_img, p_img * 0)[0] // 2
-            base_outpath = f"{pbm_path}_{p}"
-            save_or_save_and_merge(base_outpath, "_p.png", p_img)
-            save_or_save_and_merge(base_outpath, "_i.png", o_img)
+def layer(og_img, coords, heights, contour_height, scaling_multiplier=1.0, output_as_img=False):
+    current_time = str(datetime.now()).replace(":",".")
+    (b,w) = (0,255) if contour_height > 0 else (255,0)
+    img = np.full_like(og_img, b)
+    height_index = 0
+    current_height = heights[0]
+    while True:
+        edge_points = find_edge(cv2.bitwise_not(img)) if contour_height > 0 else find_edge(img)
+        while len(edge_points) > 0:
+            e = edge_points.pop()
+            og_img, edges = floodfill(e, b, w, og_img, None, edge_points)
+            img, _ = floodfill(e, w, 128, og_img, img)
+        if height_index < len(heights) and current_height == heights[height_index]:
+            for h in coords[current_height]:
+                og_img, _ = floodfill(h, b, w, og_img, None)
+                img, _ = floodfill(h, w, 128, og_img, img)
+            height_index += 1
+        img[img == 128] = w
+        if np.array_equal(img, np.full_like(og_img, w)):
+            break
 
-def find_edge(img, c1, c2, check8=False, output_set=True):
-    points = []
-    for i in range(img.shape[0]):
-        for j in range(img.shape[1]):
-            i1, i2, j1, j2 = i-1, i+1, j-1, j+1
+        geo["features"].append(img_to_multipolygon(img, current_height, scaling_multiplier))
 
-            if img[i, j] == c1:
-                if i1 >= 0 and img[i1, j] == c2:
-                    points.append((i, j))
-                elif i2 < img.shape[0] and img[i2, j] == c2:
-                    points.append((i, j))
-                elif j1 >= 0 and img[i, j1] == c2:
-                    points.append((i, j))
-                elif j2 < img.shape[1] and img[i, j2] == c2:
-                    points.append((i, j))
+        if output_as_img:
+            if not os.path.exists("temp"):
+                os.makedirs("temp")
+            cv2.imwrite(f"temp/{current_time}_{current_height}.png", img)
 
-                if check8:
-                    if i1 >= 0 and j1 >= 0 and img[i1, j1] == c2:
-                        points.append((i, j))
-                    elif i1 >= 0 and j2 < img.shape[1] and img[i1, j2] == c2:
-                        points.append((i, j))
-                    elif i2 < img.shape[0] and j1 >= 0 and img[i2, j1] == c2:
-                        points.append((i, j))
-                    elif i2 < img.shape[0] and j2 < img.shape[1] and img[i2, j2] == c2:
-                        points.append((i, j))
-    if output_set:
-        return set(points)
-    return points
-
-def draw_layers(extremum_heights, contour_height, o, pbm_path):
-    current_height = extremum_heights[0]
-    m = np.full_like(o, 255)
-    extrema_so_far = 0
-    while not np.array_equal(m, np.full_like(m, 0)):
-        points = find_edge(m, 255, 0, False)
-        while points:
-            p = points.pop()
-            o, points = floodfill(p, 255, 0, o)
-            m = floodfill(p, 0, 1, o, m)[0]
-            m[m == 1] = 0
-        if extrema_so_far < len(extremum_heights) and current_height == extremum_heights[extrema_so_far]:
-            i = cv2.imread(f"{pbm_path}_{current_height}_i.png", 0)
-            m = cv2.bitwise_and(m, i)
-            o = cv2.bitwise_and(o, m)
-            extrema_so_far += 1
-        cv2.imwrite(f"{pbm_path}_{current_height}_l.png", m)
         current_height = current_height - contour_height
 
-def prepped_img_to_png(img_path, png_path, peak_coords, valley_coords,contour_height, delete_nonlayers=True):
-    # peak_coords i valley_coords to dict
-    # w ktorym klucze to wysokosci ekstremow (od nich odejmowane/dodawane contour_heights)
-    # wartosci to listy, w ktorych kazda wartosc to tuple z koordynatami XY danego ekstremum
-    # contour_height to roznica wysokosci miedzy poziomicami
-    #funkcja zaklada mape o czarnym tle i bialych konturach, gdzie kazdy kontur to krzywa zamknieta!!!
-    #uwaga - punkty w peak_coords i valley_coords powinny byc w odwrotnej kolejnosci niz sie pokazuje w np. GIMPie, tj.
-    """
-    ___X__
-    ______
-    """
-    # w GIMPie X to by było (4,1), tu musi byc (1,4)
-    og_img = cv2.imread(img_path,0) // 255
-    peak_heights = sorted(peak_coords.keys(),reverse=True)
-    valley_heights = sorted(valley_coords.keys())
 
-    fill_out_extremums(peak_heights,peak_coords,og_img, png_path)
-    fill_out_extremums(valley_heights,valley_coords,og_img, png_path)
 
-    o = cv2.bitwise_not(og_img*255)
-    if len(peak_heights) > 0 and len(valley_heights) == 0:
-        draw_layers(peak_heights,contour_height,o, png_path)
-    elif len(peak_heights) == 0 and len(valley_heights) > 0:
-        draw_layers(valley_heights,-contour_height,o,png_path)
-    else:
-        draw_layers(peak_heights,contour_height,o, png_path)
-        #missing - correction for files with both valleys and hills
+def get_layers(img_path, coords, contour_height, scaling_multiplier=1.0, output_as_img=False):
+    og_img = cv2.imread(img_path,0)
+    if contour_height > 0:
+        heights = sorted(list(coords.keys()),reverse=True)
+        layer(og_img, coords, heights, contour_height,  scaling_multiplier, output_as_img)
+    elif contour_height < 0:
+        heights = sorted(list(coords.keys()))
+        layer(cv2.bitwise_not(og_img), coords, heights, contour_height, scaling_multiplier, output_as_img)
 
-    if delete_nonlayers:
-        p = os.path.split(png_path)
-        contents = os.listdir(p[0])
-        for c in contents:
-            if c.startswith(p[1]+"_") and (c.endswith("_i.png") or c.endswith("_p.png")):
-                os.remove(os.path.join(p[0],c))
+def output_geojson(geo_path):
+    with open(geo_path,mode="w") as f:
+        f.write(json.dumps(geo,indent=1))
 
-def layer_png_to_contour(img_path,multiplier):
-    img = cv2.imread(img_path, 0)
-    img = cv2.bitwise_not(img)
-    contours, _ = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_KCOS)
-    l = []
-    for c in contours:
-        l.append((c.reshape(-1,2)*multiplier).tolist())
-    return l
-
-def layer_png_to_geojson(img_path,geojson_path,max_point=30,min_height=0):
-    folder_path = os.path.split(img_path)
-    filelist = os.listdir(folder_path[0])
-    multiplier = max_point/max(cv2.imread(os.path.join(folder_path[0],filelist[0]),0).shape) if max_point != 0 else 1.0
-    d = {}
-    for f in filelist:
-        if "_l.png" in f:
-            elevation = int(f[len(folder_path[1])+1:-6])
-            d[elevation] = {"f" : os.path.join(folder_path[0],f)}
-            d[elevation]["c"] = layer_png_to_contour(d[elevation]["f"],multiplier)
-            for c in range(len(d[elevation]["c"])):
-                d[elevation]["c"][c].append(d[elevation]["c"][c][0])
-    geo = {"features" : [], "type":"FeatureCollection"}
-    keys = sorted(list(d.keys()))
-
-    height_modifier = min_height - keys[0] if min_height is not None else 0
-    for k in keys:
-        for c in d[k]["c"]:
-            geo["features"].append({"geometry" : {"coordinates" : c, "type" : "LineString"}, "properties" : {"elevation" : float(k + height_modifier)}, "type" : "Feature"})
-    j = json.dumps(geo,indent=1)
-    with open(geojson_path, mode="w") as f:
-        f.write(j)
-
-def prepped_img_to_geojson(peak_coords, valley_coords, contour_height, img_path, geojson_path, png_path=None, delete_nonlayers=True, delete_layers=True,max_point=30, min_height=0):
-    png_path = uuid_path("", png_path, True)
-
-    prepped_img_to_png(img_path,png_path,peak_coords,valley_coords,contour_height,delete_nonlayers)
-
-    layer_png_to_geojson(png_path, geojson_path, max_point, min_height)
-
-    if delete_layers:
-        p = os.path.split(png_path)
-        contents = os.listdir(p[0])
-        for c in contents:
-            if c.startswith(p[1] + "_") and c.endswith("_l.png"):
-                os.remove(os.path.join(p[0], c))
-
-if __name__ == "__main__":
-
-    img_path = "example_map3.png"
-    peak_coords = {110 : [(1222,1553)],100 : [(1270,3000)]}
-
-    valley_coords = {}
-
-    prepped_img_to_geojson(peak_coords, valley_coords, 10, img_path, "temp/geo.geojson", None, True, False, 30, 0)
+def img_to_geo(img_path, geo_path, layer_coords, contour_height, scaling_multiplier=1.0,  output_as_img=False):
+    get_layers(img_path, layer_coords, contour_height, scaling_multiplier, output_as_img)
+    output_geojson(geo_path)
