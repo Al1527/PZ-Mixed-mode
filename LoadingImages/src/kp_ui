@@ -1,0 +1,194 @@
+import kp_img_to_geo as kp
+from pathlib import Path
+from PIL import Image, ImageTk
+import tkinter as tk
+from tkinter import simpledialog
+import subprocess
+import os
+import cv2
+
+def str_to_float(s):
+    if s.strip().lstrip('-').replace('.', '', 1).isdigit():
+        return float(s)
+    elif len(s) > 1 and s[0] == "+" and s[1:].replace('.','',1).isdigit():
+        return float(s[1:])
+    else:
+        return None
+
+warnings = {
+    "inpath_nonexistent" : "Path doesn't exist",
+    "inpath_nonfile" : "Path doesn't lead to a file",
+    "inpath_nonimg" : "Path doesn't lead to an image, or the image is corrupted",
+    "inpath_badimg" : "Path leads to image with invalid colors",
+    "inpath_ok" : "",
+
+    "outpath_bad" : "Path cannot be opened",
+    "outpath_ok" : "",
+
+    "elevation_nan" : "Must be a number",
+    "elevation_0" : "Cannot be 0",
+    "elevation_ok" : "",
+
+    "scale_nan" : "Must be a number",
+    "scale_0" : "Cannot be 0",
+    "scale_neg" : "Cannot be negative",
+    "scale_ok" : ""
+}
+
+class Input:
+    root = tk.Tk(baseName="Img2Geojson")
+
+    frame_config = tk.Frame(root)
+    frame_img = tk.Frame(root)
+
+    text_inpath = tk.StringVar()
+    field_inpath = tk.Entry(frame_config, textvariable=text_inpath,width=100)
+    label_inpath = tk.Label(frame_config, text="Image Path (input) ")
+    warn_inpath = tk.Label(frame_config, text="",fg="red")
+
+    text_outpath = tk.StringVar()
+    field_outpath = tk.Entry(frame_config, textvariable=text_outpath,width=100)
+    label_outpath = tk.Label(frame_config, text="GeoJSON Path (output) ")
+    warn_outpath = tk.Label(frame_config,text="",fg="red")
+
+    text_elevation = tk.StringVar()
+    field_elevation = tk.Entry(frame_config, textvariable=text_elevation,width=100)
+    label_elevation = tk.Label(frame_config, text="Height between contours ")
+    warn_elevation = tk.Label(frame_config,text="",fg="red")
+
+    text_scale = tk.StringVar()
+    field_scale = tk.Entry(frame_config, textvariable=text_scale,width=100)
+    label_scale = tk.Label(frame_config, text="Scale (1px = ?) ")
+    warn_scale = tk.Label(frame_config, text="",fg="red")
+
+    button_open_img = tk.Button(frame_config, text="Open image")
+    button_start = tk.Button(frame_config, text="Start")
+
+    label_img = tk.Label(frame_img)
+
+    extremum_data = {}
+    extremum_str = ""
+
+    def extremum_string(self):
+        self.extremum_str = "{"
+        ele = list(self.extremum_data.keys())
+        for i in range(len(ele)):
+            e = ele[i]
+            p = self.extremum_data[e]
+            self.extremum_str = f"{self.extremum_str}\n\t{e} : ["
+            for j in range(len(p)):
+                self.extremum_str = f"{self.extremum_str}\n\t\t{p[j]}{"," if j != len(p)-1 else ""}"
+            self.extremum_str += "\n\t]"
+            self.extremum_str += "," if i != len(ele)-1 else ""
+        self.extremum_str +="\n}"
+
+
+
+    def on_click(self,event):
+        print(f"Clicked at: {event.x}, {event.y}")
+        n = simpledialog.askfloat("Elevation?", f"Enter the elevation of point ({event.y},{event.x}):")
+        if n is not None:
+            if n not in self.extremum_data:
+                self.extremum_data[n] = []
+            self.extremum_data[n].append((event.y,event.x))
+            self.extremum_string()
+
+    def open_img(self):
+        p = self.text_inpath.get()
+        if not os.path.exists(p):
+            self.warn_inpath.config(text=warnings["inpath_nonexistent"])
+        elif not os.path.isfile(p):
+            self.warn_inpath.config(text=warnings["inpath_nonfile"])
+        else:
+            img = cv2.imread(p, 0)
+            if img is None:
+                self.warn_inpath.config(text=warnings["inpath_nonimg"])
+            elif set(img.flatten()) != {0, 255}:
+                self.warn_inpath.config(text=warnings["inpath_badimg"])
+            else:
+                self.warn_inpath.config(text=warnings["inpath_ok"])
+                img = ImageTk.PhotoImage(Image.fromarray(img))
+                self.label_img.image = img
+                self.label_img.config(image=img)
+
+    def start(self):
+        elevation = str_to_float(self.text_elevation.get())
+        scale = str_to_float(self.text_scale.get())
+        outpath = self.text_outpath.get()
+        p = self.text_inpath.get()
+        start_ok = False
+
+        if not os.path.exists(p):
+            self.warn_inpath.config(text=warnings["inpath_nonexistent"])
+        elif not os.path.isfile(p):
+            self.warn_inpath.config(text=warnings["inpath_nonfile"])
+        else:
+            img = cv2.imread(p, 0)
+            if img is None:
+                self.warn_inpath.config(text=warnings["inpath_nonimg"])
+            elif set(img.flatten()) != {0, 255}:
+                self.warn_inpath.config(text=warnings["inpath_badimg"])
+            else:
+                self.warn_inpath.config(text=warnings["inpath_ok"])
+                start_ok = True
+
+        if elevation is None:
+            self.warn_elevation.config(text=warnings["elevation_nan"])
+            start_ok = False
+        elif elevation == 0:
+            self.warn_elevation.config(text=warnings["elevation_0"])
+            start_ok = False
+        else:
+            self.warn_elevation.config(text=warnings["elevation_ok"])
+
+        if scale is None:
+            self.warn_scale.config(text=warnings["scale_nan"])
+            start_ok = False
+        elif scale == 0:
+            self.warn_elevation.config(text=warnings["scale_0"])
+            start_ok = False
+        elif scale < 0:
+            self.warn_elevation.config(text=warnings["scale_neg"])
+            start_ok = False
+        else:
+            self.warn_scale.config(text=warnings["scale_ok"])
+
+        if start_ok:
+            kp.img_to_geo(p, outpath, self.extremum_data, elevation, scale, False)
+            subprocess.Popen(rf'explorer /select,"{outpath}"')
+
+    def __init__(self):
+        self.label_img.bind("<Button-1>", self.on_click)
+        self.frame_config.pack()
+        self.frame_img.pack()
+
+        self.button_open_img.config(command=self.open_img)
+        self.button_start.config(command=self.start)
+
+        self.label_inpath.grid(row=0, column=0)
+        self.label_outpath.grid(row=1, column=0)
+        self.label_elevation.grid(row=2, column=0)
+        self.label_scale.grid(row=3, column=0)
+
+        self.field_inpath.grid(row=0, column=1)
+        self.field_outpath.grid(row=1, column=1)
+        self.field_elevation.grid(row=2,column=1)
+        self.field_scale.grid(row=3,column=1)
+
+        self.button_open_img.grid(row=0, column=2)
+        self.button_start.grid(row=1,column=2,rowspan=3)
+
+        self.warn_inpath.grid(row=0,column=3)
+        self.warn_outpath.grid(row=1, column=3)
+        self.warn_elevation.grid(row=2, column=3)
+        self.warn_scale.grid(row=3, column=3)
+
+        self.label_img.grid(row=0,column=0)
+
+        self.root.mainloop()
+
+
+
+if __name__ == "__main__":
+    i = Input()
+
