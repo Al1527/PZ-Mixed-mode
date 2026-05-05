@@ -34,6 +34,7 @@ class WindowManager{
     int scaleHeight = 1;
     int size = 1;
     int colorChosed = 1;
+    bool drawMode = true;
     int morph_elem = 0;
     int morph_size = 0;
 
@@ -59,6 +60,18 @@ class WindowManager{
      * @param rgb Kolor który chcemy wyodrębinić.
      */
     std::vector<cv::Mat> removeColorWindow(std::vector<cv::Mat>& images, Config &config, cv::Scalar rgb);
+
+    /**
+     * @brief Okno pozwalające na wyodrębnienie koloru ze zdjęcia.
+     *
+     * Wyświetla okno w którym jesteś w stanie wyodrębinić wszystkie inne kolory.
+     * Za pomocą suwaków określasz zakres na ile podobny kolor zostanie usuniety.
+     *
+     * @param images Vector zdjęć (cv::Mat) z których chcemy wyodrębinić kolor.
+     * @param config Konfiguracja.
+     * @param rgb Kolor który chcemy wyodrębinić.
+     */
+    cv::Mat removeColorWindow(cv::Mat image, Config &config, cv::Scalar rgb);
 
 
     /**
@@ -93,6 +106,9 @@ class WindowManager{
      * @param img Zjecie (cv::Mat) na którym chcemy przeprowadzić rozszerznie i szkieletonizacje.
      */
     cv::Mat fixGapsInContourWindow(cv::Mat img); 
+
+
+    cv::Mat fixGapsInContourWindow2(cv::Mat img, Config& config);
 
   private:
 

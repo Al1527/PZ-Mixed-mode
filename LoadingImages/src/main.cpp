@@ -16,15 +16,13 @@ int main() {
   loadImages("images", images);
   config.checkFormat(images.size());
 
-  cv::Scalar pickedColor = windowManager.pickColorWindow(images[0]);
+  cv::Mat connectedImages = connectAllImages(images, {config.imageFormatColumns, config.imageFormatRows});
 
-  std::vector<cv::Mat> convertedImages = windowManager.removeColorWindow(images, config, pickedColor);
+  cv::Scalar pickedColor = windowManager.pickColorWindow(connectedImages);
 
-  cv::Mat connectedImages = connectAllImages(convertedImages, {config.imageFormatColumns, config.imageFormatRows});
+  cv::Mat convertedImage = windowManager.removeColorWindow(connectedImages, config, pickedColor);
 
-  cv::Mat buf = windowManager.drawWindow(connectedImages, config);
- 
-  cv::Mat output = windowManager.fixGapsInContourWindow(buf);
+  cv::Mat output = windowManager.fixGapsInContourWindow2(convertedImage, config);
   
   putImageToDirectory("output", output, "output"); 
   

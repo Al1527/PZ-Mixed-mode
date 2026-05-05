@@ -1,12 +1,12 @@
 {
   "imageFormat": {
-    "columns": 2,
-    "rows": 2
+    "columns": 1,
+    "rows": 1
   },
   "contour": {
     "scaleOfHeight": 1000,
     "minHeight": 1850,
-    "maxHeight": 1992,
+    "maxHeight": 2127,
     "maxToleranceOfColor": 200,
     "freqOfPoints": 300
   }

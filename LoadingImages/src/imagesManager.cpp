@@ -202,7 +202,10 @@ cv::Mat morphologyClosing(cv::Mat image, int size, int e){
 }
 
 cv::Mat skeletonization(cv::Mat image, int size, int e){
-  cv::Mat element = cv::getStructuringElement(e, cv::Size(size, size));
+  if (size == 0){
+    return image;
+  }
+  cv::Mat element = cv::getStructuringElement(e, cv::Size((2 * size) + 1, (2 * size) + 1));
   cv::Mat buf;
 
   cv::dilate(image, buf, element, cv::Point(-1,-1), 1);
