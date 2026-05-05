@@ -7,11 +7,17 @@
 #include "opencv2/opencv.hpp"
 
 cv::Scalar WindowManager::pickColorWindow(cv::Mat &img){
+  cv::cvtColor(img, img, cv::COLOR_BGRA2BGR);
   this->img = img;
   cv::namedWindow("pickColorWindow");
   cv::setMouseCallback("pickColorWindow", getColor, this);
-  cv::imshow("pickColorWindow", img);
-  cv::waitKey(0);
+  while (true){
+    cv::imshow("pickColorWindow", img);
+
+    int key = cv::waitKey(10);
+    if (key == 27)
+        break;
+  }
   cv::destroyAllWindows();
   return this->pickedColor;
 }
