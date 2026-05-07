@@ -64,7 +64,10 @@ class Input:
     button_open_img = tk.Button(frame_config, text="Open image")
     button_start = tk.Button(frame_config, text="Start")
 
-    label_img = tk.Label(frame_img)
+    label_img = tk.Canvas(frame_img,bg="#f0f0f0")
+    img = None
+    img_x_scroll = tk.Scrollbar(frame_img, orient="horizontal", command=label_img.xview)
+    img_y_scroll = tk.Scrollbar(frame_img, orient="vertical", command=label_img.yview)
 
     extremum_data = {}
     extremum_str = ""
@@ -86,11 +89,13 @@ class Input:
 
     def on_click(self,event):
         print(f"Clicked at: {event.x}, {event.y}")
-        n = simpledialog.askfloat("Elevation?", f"Enter the elevation of point ({event.y},{event.x}):")
+        y = int(event.y+self.label_img.canvasy(0))
+        x = int(event.x+self.label_img.canvasx(0))
+        n = simpledialog.askfloat("Elevation?", f"Enter the elevation of point ({y},{x}):")
         if n is not None:
             if n not in self.extremum_data:
                 self.extremum_data[n] = []
-            self.extremum_data[n].append((event.y,event.x))
+            self.extremum_data[n].append((y,x))
             self.extremum_string()
 
     def open_img(self):
@@ -100,16 +105,18 @@ class Input:
         elif not os.path.isfile(p):
             self.warn_inpath.config(text=warnings["inpath_nonfile"])
         else:
-            img = cv2.imread(p, 0)
-            if img is None:
+            self.img = cv2.imread(p, 0)
+            if self.img is None:
                 self.warn_inpath.config(text=warnings["inpath_nonimg"])
-            elif set(img.flatten()) != {0, 255}:
+            elif set(self.img.flatten()) != {0, 255}:
                 self.warn_inpath.config(text=warnings["inpath_badimg"])
             else:
                 self.warn_inpath.config(text=warnings["inpath_ok"])
-                img = ImageTk.PhotoImage(Image.fromarray(img))
-                self.label_img.image = img
-                self.label_img.config(image=img)
+                self.img = ImageTk.PhotoImage(Image.fromarray(self.img))
+                self.label_img.create_image(0,0, anchor="nw", image=self.img)
+                self.label_img.config(scrollregion=(0, 0, self.img.width(), self.img.height()))
+                #self.label_img.image = img
+                #self.label_img.config(image=img)
 
     def start(self):
         elevation = str_to_float(self.text_elevation.get())
@@ -184,6 +191,8 @@ class Input:
         self.warn_scale.grid(row=3, column=3)
 
         self.label_img.grid(row=0,column=0)
+        self.img_x_scroll.grid(row=1,column=0)
+        self.img_y_scroll.grid(row=0,column=1)
 
         self.root.mainloop()
 
