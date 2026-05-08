@@ -7,8 +7,7 @@ from datetime import datetime
 
 geo = {"features": [], "type": "FeatureCollection"}
 
-#zmienic metode skalowania - podane z klawiatury
-#usunac to do szczytow
+#dodac spowrotem normalizacje wysokosci do 0
 
 def fix_polygon(p):
     if len(p) == 1:
@@ -20,7 +19,7 @@ def fix_polygon(p):
         return p
 
 def img_to_multipolygon(img, elevation, scaling_multiplier=1.0):
-    m = {"geometry" : {"coordinates" : [[]], "type" : "MultiPolygon"}, "properties" : {"elevation" : elevation}, "type" : "Feature"}
+    m = {"geometry" : {"coordinates" : [], "type" : "MultiPolygon"}, "properties" : {"elevation" : elevation}, "type" : "Feature"}
     cont, hier = cv2.findContours(img, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_TC89_KCOS)
     hier = hier[0]
     coords = {}
@@ -34,9 +33,9 @@ def img_to_multipolygon(img, elevation, scaling_multiplier=1.0):
             if hier[h][3] not in coords:
                 coords[hier[h][3]] = {"outer": None, "inner": []}
             coords[hier[h][3]]["inner"].append(fix_polygon(c))
-
     for _ in coords:
         c = coords[_]
+        m["geometry"]["coordinates"].append([])
         m["geometry"]["coordinates"][-1].append(c["outer"])
         for i in c["inner"]:
             m["geometry"]["coordinates"][-1].append(i)
