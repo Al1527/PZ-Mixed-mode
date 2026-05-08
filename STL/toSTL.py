@@ -6,16 +6,28 @@ from matplotlib.path import Path
 
 
 class ContourToSTL:
-    def __init__(self, resolution=1.0, max_size=1000.0, base_thickness=20.0):
+    def __init__(self, base_thickness=20.0, scale_proportional=True, max_size=0, max_x=0, max_y=0, max_z=0):
         """
-        resolution: rozmiar komórki siatki
-        max_size: maksymalny wymiar modelu w mm (X, Y lub Z)
-        base_thickness: grubość podstawy modelu w mm
+        base_thickness: grubość podstawy w mm
+        
+        scale_proportional=True:
+            max_size: jeden parametr skaluje X, Y i Z proporcjonalnie
+                0   = zostaw jak jest
+                >0  = skaluj wszystko do max_size (zachowując proporcje)
+        
+        scale_proportional=False:
+            max_x, max_y, max_z: każda oś osobno
+                0   = zostaw jak jest
+                >0  = skaluj do podanej wartości
         """
-        self.resolution = resolution
-        self.max_size = max_size
-        self.scale = None
         self.base_thickness = base_thickness
+        self.scale_proportional = scale_proportional
+        self.max_size = max_size
+        self.max_x = max_x
+        self.max_y = max_y
+        self.max_z = max_z
+        
+        self.scale = None
         self.contour_points = []
         self.elevations = []
         self.polygons_with_holes = []
@@ -54,12 +66,32 @@ class ContourToSTL:
                 self._add_polygon(elevation, outer, holes)
 
             elif geom_type == 'MultiPolygon':
-                # Każdy element to jeden polygon z opcjonalnymi dziurami
                 for polygon in coords:
                     outer = polygon[0]
-                    holes = polygon[1:] if len(polygon) > 1 else []
-                    self._add_polygon(elevation, outer, holes)
-
+        
+        # Sprawdź czy to błędnie zagnieżdżony pojedynczy punkt czy ring
+        # Jeśli outer[0] jest listą list, mamy dodatkowy poziom zagnieżdżenia
+                    if outer and isinstance(outer[0][0], list):
+            # Dane mają zbyt głębokie zagnieżdżenie — wypłaszcz
+                        actual_rings = outer  # outer to tak naprawdę lista ringów
+                    else:
+                        actual_rings = polygon  # normalna struktura
+        
+                    outer_ring = actual_rings[0]
+                    outer_path = Path(np.array([[c[0], c[1]] for c in outer_ring]))
+        
+                    real_holes = []
+                    for ring in actual_rings[1:]:
+                        ring_np = np.array([[c[0], c[1]] for c in ring])
+                        centroid = ring_np.mean(axis=0)
+            # Tylko jeśli środek ciężkości leży WEWNĄTRZ outer ringa → dziura
+                        if outer_path.contains_point(centroid):
+                            real_holes.append(ring)
+                        else:
+                # Osobny kontur tej samej elewacji
+                            self._add_polygon(elevation, ring, [])
+        
+                    self._add_polygon(elevation, outer_ring, real_holes)
             else:
                 print(f"Nieobsługiwany typ geometrii: {geom_type}, pomijam")
             
@@ -196,13 +228,39 @@ class ContourToSTL:
         print(f"Wysokość min: {self.grid_z.min():.1f}, max: {self.grid_z.max():.1f}")
         return self.grid_x, self.grid_y, self.grid_z
 
+    def _compute_scales(self, x_range, y_range, z_range):
+        """Oblicz skale dla każdej osi na podstawie trybu skalowania."""
+    
+        if self.scale_proportional:
+            if self.max_size == 0:
+                scale_x = scale_y = scale_z = 1.0
+                print("Brak skalowania (scale_proportional=True, max_size=0)")
+            else:
+                largest = max(x_range, y_range, z_range)
+                scale_x = scale_y = scale_z = self.max_size / largest
+                print(f"Skalowanie proporcjonalne: {scale_x:.4f} "
+                      f"(największy wymiar: {largest:.1f} → {self.max_size}mm)")
+        else:
+            scale_x = (self.max_x / x_range) if self.max_x > 0 else 1.0
+            scale_y = (self.max_y / y_range) if self.max_y > 0 else 1.0
+            scale_z = (self.max_z / z_range) if self.max_z > 0 else 1.0
+            print(f"Skalowanie niezależne: "
+                  f"X={scale_x:.4f}, Y={scale_y:.4f}, Z={scale_z:.4f}")
+
+        print(f"Wymiary modelu: "
+              f"{x_range*scale_x:.1f} x "
+              f"{y_range*scale_y:.1f} x "
+              f"{z_range*scale_z:.1f} mm")
+    
+        return scale_x, scale_y, scale_z
+
     def generate_mesh(self):
         """Generuj mesh 3D z heightmap"""
         if self.grid_z is None:
             raise ValueError("Najpierw stwórz heightmap!")
-    
+
         height, width = self.grid_z.shape
-    
+
         points = np.array(self.contour_points)
         x_min, y_min = points.min(axis=0)
         x_max, y_max = points.max(axis=0)
@@ -211,22 +269,12 @@ class ContourToSTL:
         y_range = y_max - y_min
         z_range = self.grid_z.max() - self.grid_z.min()
 
-        largest_dim = max(x_range, y_range, z_range)
-
-        if largest_dim > self.max_size:
-            self.scale = self.max_size / largest_dim
-            print(f"Model za duży, skaluję: {self.scale:.4f}")
-        else:
-            self.scale = 1.0
-            print(f"Model mieści się w limicie, brak skalowania")
-
-        print(f"Wymiary modelu: {x_range*self.scale:.1f} x {y_range*self.scale:.1f} x {z_range*self.scale:.1f} mm")
-    
+        scale_x, scale_y, scale_z = self._compute_scales(x_range, y_range, z_range)
 
         z_min = self.grid_z.min()
-        target_z = self.max_size - self.base_thickness
-        z_normalized = (self.grid_z - z_min) * self.scale
-
+        #z_normalized = (self.grid_z - z_min) * scale_z
+        z_normalized = self.grid_z * scale_z
+        
         vertices = []
         faces = []
         vertex_map = {}
@@ -234,19 +282,18 @@ class ContourToSTL:
         for i in range(height):
             for j in range(width):
                 idx = i * width + j
-                x = (self.grid_x[i, j] - x_min) * self.scale  # normalizuj od 0
-                y = (self.grid_y[i, j] - y_min) * self.scale
+                x = (self.grid_x[i, j] - x_min) * scale_x  # ← było self.scale
+                y = (self.grid_y[i, j] - y_min) * scale_y  # ← było self.scale
                 z = z_normalized[i, j]
                 vertices.append([x, y, z])
                 vertex_map[(i, j)] = idx
 
-        
-        # Generuj wierzchołki dolnej powierzchni (podstawa)
+        # Dolna powierzchnia (podstawa)
         base_offset = len(vertices)
         for i in range(height):
             for j in range(width):
-                x = (self.grid_x[i, j] - x_min) * self.scale
-                y = (self.grid_y[i, j] - y_min) * self.scale
+                x = (self.grid_x[i, j] - x_min) * scale_x  # ← było self.scale
+                y = (self.grid_y[i, j] - y_min) * scale_y  # ← było self.scale
                 vertices.append([x, y, -self.base_thickness])
         
         # Generuj trójkąty górnej powierzchni
@@ -332,15 +379,15 @@ class ContourToSTL:
         print(f"  Rozmiar pliku: {terrain_mesh.data.nbytes / 1024:.1f} KB")
 
 if __name__ == "__main__":
-    # Utwórz konwerter
+    # Ustawic parametry
     converter = ContourToSTL(
-        resolution=2.0,      # 2mm na komórkę siatki
-        max_size=1000.0,        # Przesada pionowa
-        base_thickness=20.0   # Podstawa 20mm
+        scale_proportional=False,
+       
+        base_thickness=20.0
     )
     
     # Wczytaj poziomice z pliku
-    converter.load_geojson('cont_multi.geojson')
+    converter.load_geojson('majj.geojson')
     converter.create_heightmap()
     
     
@@ -348,5 +395,4 @@ if __name__ == "__main__":
     converter.generate_mesh()
     
     # Eksportuj do STL
-    converter.export_stl('terrain_multi.stl')
-
+    converter.export_stl('terrain_m.stl')
