@@ -1,0 +1,11 @@
+main
+*.o
+*.out
+*.exe
+
+compile_commands.json
+*.log
+*.tmp
+
+.cache/
+
