@@ -211,7 +211,7 @@ cv::Mat skeletonization(cv::Mat image, int size, int e){
   cv::dilate(image, buf, element, cv::Point(-1,-1), 1);
   cv::Mat output;
 
-  cv::ximgproc::thinning(buf, output, cv::ximgproc::THINNING_ZHANGSUEN);
+  cv::ximgproc::thinning(buf, output, cv::ximgproc::THINNING_GUOHALL);
 
   return output;
 }
