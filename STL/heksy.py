@@ -1,10 +1,7 @@
 import trimesh
-import trimesh.boolean
-import trimesh.repair
 import numpy as np
 from shapely.geometry import Polygon
 import trimesh.creation
-import os
 
 def generate_hex_centers(bbox_min, bbox_max, hex_size=1.0):
     """Generuje centra heksagonów - spacing wyliczony geometrycznie"""
@@ -39,69 +36,43 @@ def project_hex_onto_mesh(source_mesh, hex_size=2.0, gap=0.1):
     
     centers = generate_hex_centers(bbox_min, bbox_max, hex_size)
     
-    ray_origins = np.array([
-        [cx, cy, bbox_max[2] + 1.0]
-        for cx, cy in centers
-    ])
+    # Ray casting z góry zamiast closest_point
+    ray_origins = np.array([[cx, cy, bbox_max[2] + 1.0] for cx, cy in centers])
     ray_directions = np.tile([0, 0, -1], (len(centers), 1))
     
-    intersector = trimesh.ray.ray_triangle.RayMeshIntersector(source_mesh)
-    locations, ray_indices, _ = intersector.intersects_location(
-        ray_origins, ray_directions, multiple_hits=False
+    locations, index_ray, _ = source_mesh.ray.intersects_location(
+        ray_origins=ray_origins,
+        ray_directions=ray_directions,
+        multiple_hits=False
     )
     
-    hit_map = {}
-    for loc, ray_idx in zip(locations, ray_indices):
-        hit_map[ray_idx] = loc[2]
-
-    # Buduj słownik: index -> (cx, cy, z_top)
-    centers_arr = np.array(centers)
-    hit_indices = list(hit_map.keys())
-    hit_xy = centers_arr[hit_indices]
-    hit_z  = np.array([hit_map[i] for i in hit_indices])
-
-    from scipy.spatial import cKDTree
-    tree = cKDTree(hit_xy)
-
-    # Dla każdego trafionego heksa — sprawdź czy jest znacznie niższy od sąsiadów
-    # Jeśli tak, podciągnij go do maksimum z sąsiedztwa
-    neighbor_radius = hex_size * 2.2  # promień w którym szukamy sąsiadów
-    z_smoothed = hit_z.copy()
-
-    for idx in range(len(hit_indices)):
-        neighbor_idxs = tree.query_ball_point(hit_xy[idx], r=neighbor_radius)
-        neighbor_z = hit_z[neighbor_idxs]
-        z_smoothed[idx] = max(hit_z[idx], np.max(neighbor_z) * 0.85)
-        # bierze własną wysokość LUB 85% maksimum sąsiadów — co większe
-
-    z_base_global = bbox_min[2]
+    # Mapa: indeks centrum -> z_top
+    z_map = {}
+    for loc, idx in zip(locations, index_ray):
+        z_map[idx] = loc[2]
+    
+    z_base = bbox_min[2]
     hex_meshes = []
-
-    for out_idx, i in enumerate(hit_indices):
-        cx, cy = centers[i]
-        z_top = z_smoothed[out_idx]
+    
+    for i, (cx, cy) in enumerate(centers):
+        if i not in z_map:
+            continue  # promień nie trafił w mesh
+        z_top = z_map[i]
         try:
-            h = create_hex_prism_to_base(cx, cy, z_top, hex_size - gap, z_base_global)
+            h = create_hex_prism_to_base(cx, cy, z_top, hex_size - gap, z_base)
             hex_meshes.append(h)
-        except Exception:
+        except Exception as e:
+            print(f"Błąd hexa {i}: {e}")
             continue
-
+    
     if not hex_meshes:
+        print("Brak heksagonów!")
         return None
-
-    print(f"Łączenie {len(hex_meshes)} heksów przez boolean union...")
     
-    result = hex_meshes[0]
-    batch_size = 10
-    
-    for i in range(1, len(hex_meshes), batch_size):
-        batch = hex_meshes[i:i+batch_size]
-        try:
-            result = trimesh.boolean.union([result] + batch, engine='manifold')
-        except Exception:
-            result = trimesh.util.concatenate([result] + batch)
-
-    print("Watertight:", result.is_watertight)
+    print(f"Łączenie {len(hex_meshes)} heksów...")
+    result = trimesh.util.concatenate(hex_meshes)
+    result.merge_vertices()
+    print(f"Watertight: {result.is_watertight}")
     return result
 def create_hex_prism_to_base(cx, cy, z_top, hex_size, z_base):
     """Hex rozciągnięty od z_base do z_top – bez dziur"""
@@ -116,42 +87,19 @@ def create_hex_prism_to_base(cx, cy, z_top, hex_size, z_base):
     mesh = trimesh.creation.extrude_polygon(poly, height=height)
     mesh.apply_translation([0, 0, z_base])  # startuj od dołu
     return mesh
-# ── GŁÓWNA PĘTLA ──────────────────────────────────────────────────────────────
+# ── UŻYCIE ──────────────────────────────────────────────────────────────────
 
-folder_path = __path__
-output_suffix = "_hex"
+# Wczytaj swój model
+source = trimesh.load("terrain.stl")
+hex_user = float(input("enter hex size: "))
+# Generuj siatkę hex (dostosuj parametry)
+hex_grid = project_hex_onto_mesh(
+    source_mesh=source,
+    hex_size=hex_user,      # rozmiar hexa (promień)
+    gap=0.0            # odstęp między heksami
+)
 
-if not os.path.isdir(folder_path):
-    print(f"Błąd: folder '{folder_path}' nie istnieje.")
-else:
-    stl_files = [
-        f for f in os.listdir(folder_path)
-        if f.lower().endswith(".stl") and output_suffix not in f
-    ]
-
-    if not stl_files:
-        print("Brak plików STL w folderze.")
-    else:
-        print(f"Znaleziono {len(stl_files)} plików.\n")
-        for filename in stl_files:
-            full_path = os.path.join(folder_path, filename)
-            print(f"Przetwarzam: {filename}")
-            try:
-                source = trimesh.load(full_path)
-                print(f"  Wczytano: {len(source.faces)} faces, watertight: {source.is_watertight}")
-
-                result = project_hex_onto_mesh(source, hex_size=5.0, gap=0.0)
-
-                if result is not None:
-                    base, ext = os.path.splitext(filename)
-                    out_path = os.path.join(folder_path, base + output_suffix + ext)
-                    result.export(out_path)
-                    print(f"  Zapisano: {base + output_suffix + ext}\n")
-                else:
-                    print(f"  Pominięto — brak wynikowych hexów.\n")
-
-            except Exception as e:
-                import traceback
-                print(f"  Błąd: {e}")
-                traceback.print_exc()
-                continue
+if hex_grid is not None:
+    hex_grid.export("hex_grid.stl")
+    print("Zapisano: hex_grid.stl")
+    
